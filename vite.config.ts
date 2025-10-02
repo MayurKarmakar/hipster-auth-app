@@ -17,7 +17,7 @@ export default defineConfig({
         "./UserProfile": "./src/components/user-profile.tsx",
       },
       remotes: {
-        storeApp: "http://localhost:3004/assets/remoteEntry.js",
+        storeApp: "https://hipster-store-app.netlify.app/assets/remoteEntry.js",
       },
       shared: ["react", "react-dom"],
     }),
