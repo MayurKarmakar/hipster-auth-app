@@ -6,7 +6,7 @@ Authentication micro frontend for the movie ticket booking application.
 
 ### Installation
 
-```bash
+```bash 
 cd auth-app
 pnpm install
 ```
