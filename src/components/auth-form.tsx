@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { type User, useAppStore } from "storeApp/store";
 import * as z from "zod";
+import "../App.css";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -20,14 +21,8 @@ import {
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import "../App.css"
+import { Checkbox } from "./ui/checkbox";
+import { Eye, EyeOff } from "lucide-react";
 
 // Login schema
 const loginSchema = z.object({
@@ -43,13 +38,20 @@ const registerSchema = z
     email: z.string().email("Please enter a valid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(8, "Please confirm your password"),
-    role: z.enum(["user", "admin"], {
-      error: "Please select a role",
-    }),
+    isUser: z.boolean(),
+    isAdmin: z.boolean(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
+  })
+  .refine((data) => data.isUser || data.isAdmin, {
+    message: "Please select a role",
+    path: ["isUser"],
+  })
+  .refine((data) => !(data.isUser && data.isAdmin), {
+    message: "Please select only one role",
+    path: ["isUser"],
   });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -60,6 +62,11 @@ export default function AuthForm() {
   const [success, setSuccess] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
 
   const registeredUsers = useAppStore(
     (state: any) => state.registeredUsers
@@ -85,7 +92,8 @@ export default function AuthForm() {
       email: "",
       password: "",
       confirmPassword: "",
-      role: "user",
+      isUser: true,
+      isAdmin: false,
     },
   });
 
@@ -109,6 +117,8 @@ export default function AuthForm() {
       setTimeout(() => {
         addUserData(user);
         setIsLoading(false);
+        setIsLoggedIn(true);
+        setLoggedInUser(user);
       }, 1000);
     } catch (err: any) {
       setError("Login failed");
@@ -137,7 +147,7 @@ export default function AuthForm() {
         lastName: data.lastName,
         email: data.email,
         password: data.password,
-        role: data.role,
+        role: data.isAdmin ? "admin" : "user",
       };
 
       addRegisteredUser(newUser);
@@ -148,6 +158,8 @@ export default function AuthForm() {
       setTimeout(() => {
         addUserData(newUser);
         setIsLoading(false);
+        setIsLoggedIn(true);
+        setLoggedInUser(newUser);
       }, 1000);
     } catch (err: any) {
       setError("Registration failed");
@@ -165,6 +177,45 @@ export default function AuthForm() {
       registerForm.reset();
     }
   };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setLoggedInUser(null);
+    setError("");
+    setSuccess("");
+    loginForm.reset();
+    registerForm.reset();
+  };
+
+  console.log(registerForm.getValues());
+
+  if (isLoggedIn && loggedInUser) {
+    return (
+      <Card className="flex w-full max-w-md xl:max-w-md mx-auto px-4 sm:px-0">
+        <CardHeader className="px-4 sm:px-6 text-center">
+          <CardTitle className="text-xl sm:text-2xl">
+            Welcome, {loggedInUser.firstName}!
+          </CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
+            You have successfully logged in
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 sm:px-6 space-y-4">
+          <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-md text-center">
+            <p className="text-sm font-medium">Login Successful</p>
+            <p className="text-xs mt-1">You are now signed in as {loggedInUser.role}</p>
+          </div>
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            className="w-full text-sm sm:text-base"
+          >
+            Log Out
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="flex w-full max-w-md xl:max-w-md mx-auto px-4 sm:px-0">
@@ -240,31 +291,66 @@ export default function AuthForm() {
                 />
               </div>
 
-              <FormField
-                control={registerForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs sm:text-sm">Role</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={isLoading}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Select your role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-3">
+                <FormLabel className="text-xs sm:text-sm">Role</FormLabel>
+                <div className="flex flex-col space-y-3">
+                  <FormField
+                    control={registerForm.control}
+                    name="isUser"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                registerForm.setValue("isUser", true);
+                                registerForm.setValue("isAdmin", false);
+                              }
+                            }}
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormLabel className="text-xs sm:text-sm font-normal cursor-pointer">
+                          User
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={registerForm.control}
+                    name="isAdmin"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                registerForm.setValue("isAdmin", true);
+                                registerForm.setValue("isUser", false);
+                              }
+                            }}
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormLabel className="text-xs sm:text-sm font-normal cursor-pointer">
+                          Admin
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={registerForm.control}
+                    name="isUser"
+                    render={() => (
+                      <FormItem>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
 
               <FormField
                 control={registerForm.control}
@@ -295,13 +381,26 @@ export default function AuthForm() {
                       Password
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your password"
-                        disabled={isLoading}
-                        className="text-sm"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showRegisterPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          disabled={isLoading}
+                          className="text-sm pr-10"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showRegisterPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage className="text-xs" />
                   </FormItem>
@@ -317,13 +416,26 @@ export default function AuthForm() {
                       Confirm Password
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Confirm your password"
-                        disabled={isLoading}
-                        className="text-sm"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Confirm your password"
+                          disabled={isLoading}
+                          className="text-sm pr-10"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage className="text-xs" />
                   </FormItem>
@@ -385,13 +497,26 @@ export default function AuthForm() {
                       Password
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your password"
-                        disabled={isLoading}
-                        className="text-sm"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showLoginPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          disabled={isLoading}
+                          className="text-sm pr-10"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showLoginPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage className="text-xs" />
                   </FormItem>
